@@ -82,7 +82,7 @@ def issue_jwt(user_id: str, extra_claims: dict = None) -> str:
         "sub":       user_id,
         "client_id": CLIENT_ID,
         "iat":       int(time.time()),
-        "exp":       int(time.time()) + 3600,
+        "exp":       int(time.time()) + 60 * 60 * 24 *30  # 30 days
     }
     if extra_claims:
         payload.update(extra_claims)
