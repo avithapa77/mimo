@@ -18,5 +18,6 @@ MAX_GATEWAY_DISTANCE_KM = 1.0
 def setup_logging():
     logging.basicConfig(
         level=logging.INFO,
-        format = "%(asctime)s - [%(filename)s] [%(funcName)s:line %(lineno)d] - %(levelname)s - %(message)s"
+        format = "%(asctime)s- [%(filename)s]- %(funcName)s()- %(message)s"
     )
+
