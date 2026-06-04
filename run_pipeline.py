@@ -47,17 +47,17 @@ if __name__ == "__main__":
     
     token = login()  # Opens browser once, waits for Google login, returns JWT
 
-    # Simulate user standing in Kathmandu (GPS auto-selects gw_kathmandu_home)
+    #Simulate user standing in Kathmandu (GPS auto-selects gw_kathmandu_home)
     run_pipeline("Turn off the living room light", token, lat=27.7172, lng=85.3240)
-
-    # Simulate user standing in Pokhara (GPS auto-selects gw_pokhara_house)
-    run_pipeline("Turn on the garden light", token, lat=28.2096, lng=83.9856)
+    #
+    # # Simulate user standing in Pokhara (GPS auto-selects gw_pokhara_house)
+    # run_pipeline("Turn on the garden light", token, lat=28.2096, lng=83.9856)
 
     # Simulate user far from any home (raises exception)
-    try:
-        run_pipeline("Turn everything off", token, lat=26.0000, lng=80.0000)
-    except Exception as e:
-        print(f"[ERROR] {e}")
+    # try:
+    #     run_pipeline("Turn everything off", token, lat=26.0000, lng=80.0000)
+    # except Exception as e:
+    #     print(f"[ERROR] {e}")
 
-    # Manual override — no GPS needed
-    run_pipeline("Is the front door locked?", token, gateway_id="gw_kathmandu_home")
+    # # Manual override — no GPS needed
+    # run_pipeline("Is the front door locked?", token, gateway_id="gw_kathmandu_home")
