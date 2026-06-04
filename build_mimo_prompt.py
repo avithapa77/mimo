@@ -1,7 +1,12 @@
-from config import CLIENT_ID
+from config import CLIENT_ID,setup_logging
 from db import get_user, get_gateway, get_devices
+import logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 def build_mimo_prompt(user_id: str, gateway_id: str) -> str:
+    logger.info("Building Mimo Prompt")
     user    = get_user(user_id)
     gateway = get_gateway(gateway_id)
     devices = get_devices(gateway_id)

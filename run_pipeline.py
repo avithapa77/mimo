@@ -1,13 +1,17 @@
 import json
-from config import MIMO_VERSION
+from config import MIMO_VERSION, setup_logging
 from auth import validate_token
 from build_mimo_prompt import build_mimo_prompt
 from mimo import mimo
 from db import get_nearest_gateway, update_device_state
 from google_auth_server import login
+import logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 def run_pipeline(english_command: str, token: str, lat: float = None, lng: float = None, gateway_id: str = None):
-    print(f"\n{'='*50}\n  {MIMO_VERSION} | {english_command}\n{'='*50}")
+    logger.info(f"\n{'='*50}\n  {MIMO_VERSION} | {english_command}\n{'='*50}")
 
     # Auth
     claims  = validate_token(token)
@@ -19,10 +23,10 @@ def run_pipeline(english_command: str, token: str, lat: float = None, lng: float
             raise Exception("Provide either GPS coordinates (lat, lng) or a gateway_id")
         gateway_id = get_nearest_gateway(user_id, lat, lng)
     else:
-        print(f"[GPS] Manual override — using gateway: {gateway_id}")
+        logger.info(f"[GPS] Manual override — using gateway: {gateway_id}")
 
     system_prompt = build_mimo_prompt(user_id, gateway_id)
-    print(f"[PROFILE] Loaded {gateway_id}")
+    logger.info(f"[PROFILE] Loaded {gateway_id}")
 
     # MiMo decides
     results = mimo(system_prompt, english_command)
@@ -35,7 +39,7 @@ def run_pipeline(english_command: str, token: str, lat: float = None, lng: float
         "unlock":   "unlocked",
     }
     for result in results:
-        print(f"[ACTION]\n{json.dumps(result, indent=2)}")
+        logger.info(f"[ACTION]\n{json.dumps(result, indent=2)}")
         action    = result.get("action")
         device_id = result.get("device_id")
         if action in state_map and device_id:
@@ -57,7 +61,7 @@ if __name__ == "__main__":
     # try:
     #     run_pipeline("Turn everything off", token, lat=26.0000, lng=80.0000)
     # except Exception as e:
-    #     print(f"[ERROR] {e}")
+    #     logger.info(f"[ERROR] {e}")
 
     # # Manual override — no GPS needed
     # run_pipeline("Is the front door locked?", token, gateway_id="gw_kathmandu_home")

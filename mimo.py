@@ -1,6 +1,10 @@
 import json
 from groq import Groq
-from config import GROQ_API_KEY
+from config import GROQ_API_KEY,setup_logging
+import logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 def mimo(system_prompt: str, english_command: str) -> list:
     client = Groq(api_key=GROQ_API_KEY)
@@ -16,7 +20,7 @@ def mimo(system_prompt: str, english_command: str) -> list:
     )
 
     raw   = response.choices[0].message.content
-    print(f"[MIMO] {raw}")
+    logger.info(f"[MIMO] {raw}")
     clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
 
     try:
