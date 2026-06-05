@@ -50,8 +50,13 @@ def run_pipeline(english_command: str, token: str, lat: float = None, lng: float
     return results
 
 if __name__ == "__main__":
+
     
     token = login()  # Opens browser once, waits for Google login, returns JWT
+
+    #####################################
+      #  Get Real GPS and pass it here
+    #####################################
 
     #Simulate user standing in Kathmandu (GPS auto-selects gw_kathmandu_home)
     run_pipeline("Turn off the living room light", token, lat=27.7172, lng=85.3240)
