@@ -57,6 +57,7 @@ def haversine(lat1, lng1, lat2, lng2) -> float:
     return R * 2 * asin(sqrt(a))
 
 def get_nearest_gateway(user_id: str, lat: float, lng: float) -> str:
+    logger.info("Getting gateways for user %s", user_id)
     conn = get_connection()
     cur  = conn.cursor(dictionary=True)
     cur.execute("SELECT * FROM gateways WHERE user_id = %s", (user_id,))

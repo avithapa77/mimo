@@ -53,8 +53,8 @@ class CallbackHandler(BaseHTTPRequestHandler):
 
 def login() -> str:
     """
-    If a valid refresh token exists in Redis, use it silently.
-    Otherwise open browser for Google login.
+    If a valid refresh token exists in Redis, use it silently and if not
+    open browser for Google login.
     Returns a valid access token.
     """
     # Try to reuse Redis session
@@ -72,7 +72,9 @@ def login() -> str:
     # Full Google login
     server = HTTPServer(("localhost", 8080), CallbackHandler)
     logger.info("Opening browser for Google login...")
-    webbrowser.open(get_google_auth_url())
+    auth_url = get_google_auth_url()
+    
+    webbrowser.open(auth_url)
     server.serve_forever()
 
     return RESULT["access_token"]
@@ -83,7 +85,7 @@ def logout():
     REDIS.delete(SESSION_KEY)
     logger.info("Logged out — Redis session cleared")
 
-
-if __name__ == "__main__":
-    token = login()
-    logger.info(f" Ready.")
+#
+# if __name__ == "__main__":
+#     token = login()
+#     logger.info(f" Ready.")

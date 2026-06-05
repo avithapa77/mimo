@@ -22,6 +22,7 @@ def get_google_auth_url(state: str = "") -> str:
     }
     if state:
         params["state"] = state
+
     return f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
 
 
@@ -40,6 +41,7 @@ def _exchange_code_for_user(code: str) -> dict:
     userinfo_resp = httpx.get(GOOGLE_USERINFO_URL, headers={
         "Authorization": f"Bearer {tokens['access_token']}"
     })
+
     userinfo_resp.raise_for_status()
     return userinfo_resp.json()
 
@@ -52,6 +54,7 @@ def issue_jwt(user_id: str, extra_claims: dict = None) -> str:
         "iat":       int(time.time()),
         "exp":       int(time.time()) + 3600,  # 1 hour
     }
+
     if extra_claims:
         payload.update(extra_claims)
     token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
@@ -59,12 +62,8 @@ def issue_jwt(user_id: str, extra_claims: dict = None) -> str:
     return token
 
 def handle_google_callback(code: str) -> dict:
-    """
-    Exchange Google code for user info, issue access + refresh tokens.
-    Returns: { "access_token": "...", "refresh_token": "..." }
-    """
-
     user_info = _exchange_code_for_user(code)
+
     user_id   = user_info.get("sub")
     email     = user_info.get("email")
     name      = user_info.get("name")
@@ -72,7 +71,7 @@ def handle_google_callback(code: str) -> dict:
     if not user_id:
         raise Exception("Google did not return a user ID")
 
-    logger.info(f"[AUTH] Google login — {email} ({name})")
+    logger.info(f"Google login — {email} ({name})")
 
     access_token  = issue_jwt(user_id, extra_claims={"email": email, "name": name})
     refresh_token = create_session(user_id)  # stored in DB, valid 30 days

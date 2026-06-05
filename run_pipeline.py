@@ -11,10 +11,12 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 def run_pipeline(english_command: str, token: str, lat: float = None, lng: float = None, gateway_id: str = None):
-    logger.info(f"\n{'='*50}\n  {MIMO_VERSION} | {english_command}\n{'='*50}")
+
+    logger.info(f"\n{'='*50}\n   {english_command}\n{'='*50}")
 
     # Auth
     claims  = validate_token(token)
+
     user_id = claims["sub"]
 
     # Auto-select gateway from GPS, or use manual override
