@@ -39,6 +39,18 @@ def get_devices(gateway_id: str) -> list:
     conn.close()
     return devices
 
+def get_device_by_id(device_id: str) -> dict:
+    """Fetch a single device by its ID."""
+    conn = get_connection()
+    cur  = conn.cursor(dictionary=True)
+    cur.execute("SELECT * FROM devices WHERE device_id = %s", (device_id,))
+    device = cur.fetchone()
+    conn.close()
+    if not device:
+        raise Exception(f"Device {device_id} not found")
+    return device
+
+
 def update_device_state(device_id: str, new_state: str):
     conn = get_connection()
     cur  = conn.cursor()
