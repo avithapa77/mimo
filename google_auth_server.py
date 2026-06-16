@@ -1,3 +1,4 @@
+import os
 import webbrowser
 import threading
 import redis
@@ -10,7 +11,14 @@ import logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
-REDIS         = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
+REDIS = redis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    password=os.getenv("REDIS_PASSWORD"),
+    ssl=True,
+    decode_responses=True,
+    db=REDIS_DB,
+)
 SESSION_KEY   = "mimo:refresh_token"   # key in Redis
 SESSION_TTL   = 60 * 60 * 24 * 30     # 30 days in seconds
 RESULT        = {}

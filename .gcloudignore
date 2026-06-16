@@ -1,0 +1,12 @@
+.env
+.git
+__pycache__
+*.pyc
+.DS_Store
+myenv/
+_temp.wav
+output.json
+*.sql
+google_auth_server.py
+run_pipeline.py
+nepaliToJson.py

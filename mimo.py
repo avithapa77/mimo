@@ -1,13 +1,11 @@
 """
 mimo.py — MiMo AI with MCP tool calling
 
-Instead of returning JSON that Python parses, MiMo now calls
-MCP tools directly. The AI decides which tool to call and with
-what parameters — true MCP usage.
+MiMo calls MCP tools directly. The AI decides which tool to call
+and with what parameters — true MCP usage.
 """
 
 import json
-import subprocess
 from groq import Groq
 from config import GROQ_API_KEY, setup_logging
 import logging
@@ -126,8 +124,7 @@ MIMO_TOOLS = [
 
 def mimo(system_prompt: str, english_command: str) -> list:
     """
-    MiMo now uses tool calling instead of returning raw JSON.
-    The AI picks the right MCP tool and parameters itself.
+    MiMo uses tool calling to pick the right device action.
     Returns list of tool call dicts: [{name, arguments}]
     """
     client = Groq(api_key=GROQ_API_KEY)
@@ -147,7 +144,6 @@ def mimo(system_prompt: str, english_command: str) -> list:
     message = response.choices[0].message
     logger.info(f"[MIMO] finish_reason: {response.choices[0].finish_reason}")
 
-    # If MiMo called tools, return them
     if message.tool_calls:
         results = []
         for tool_call in message.tool_calls:

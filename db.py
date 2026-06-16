@@ -2,79 +2,95 @@ import secrets
 import mysql.connector
 from math import radians, cos, sin, asin, sqrt
 from datetime import datetime, timedelta
-from config import DB_CONFIG, MAX_GATEWAY_DISTANCE_KM,setup_logging
+from config import DB_CONFIG, MAX_GATEWAY_DISTANCE_KM, setup_logging
 import logging
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
+
 def get_connection():
     return mysql.connector.connect(**DB_CONFIG)
 
+
 def get_user(user_id: str) -> dict:
     conn = get_connection()
-    cur  = conn.cursor(dictionary=True)
-    cur.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
-    user = cur.fetchone()
-    conn.close()
-    if not user:
-        raise Exception(f"User {user_id} not found")
-    return user
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+        user = cur.fetchone()
+        if not user:
+            raise Exception(f"User {user_id} not found")
+        return user
+    finally:
+        conn.close()
+
 
 def get_gateway(gateway_id: str) -> dict:
     conn = get_connection()
-    cur  = conn.cursor(dictionary=True)
-    cur.execute("SELECT * FROM gateways WHERE gateway_id = %s", (gateway_id,))
-    gateway = cur.fetchone()
-    conn.close()
-    if not gateway:
-        raise Exception(f"Gateway {gateway_id} not found")
-    return gateway
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM gateways WHERE gateway_id = %s", (gateway_id,))
+        gateway = cur.fetchone()
+        if not gateway:
+            raise Exception(f"Gateway {gateway_id} not found")
+        return gateway
+    finally:
+        conn.close()
+
 
 def get_devices(gateway_id: str) -> list:
     conn = get_connection()
-    cur  = conn.cursor(dictionary=True)
-    cur.execute("SELECT * FROM devices WHERE gateway_id = %s", (gateway_id,))
-    devices = cur.fetchall()
-    conn.close()
-    return devices
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM devices WHERE gateway_id = %s", (gateway_id,))
+        return cur.fetchall()
+    finally:
+        conn.close()
+
 
 def get_device_by_id(device_id: str) -> dict:
-    """Fetch a single device by its ID."""
     conn = get_connection()
-    cur  = conn.cursor(dictionary=True)
-    cur.execute("SELECT * FROM devices WHERE device_id = %s", (device_id,))
-    device = cur.fetchone()
-    conn.close()
-    if not device:
-        raise Exception(f"Device {device_id} not found")
-    return device
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM devices WHERE device_id = %s", (device_id,))
+        device = cur.fetchone()
+        if not device:
+            raise Exception(f"Device {device_id} not found")
+        return device
+    finally:
+        conn.close()
 
 
 def update_device_state(device_id: str, new_state: str):
     conn = get_connection()
-    cur  = conn.cursor()
-    cur.execute(
-        "UPDATE devices SET state = %s WHERE device_id = %s",
-        (new_state, device_id)
-    )
-    conn.commit()
-    conn.close()
-    logger.info(f" {device_id} → {new_state}")
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE devices SET state = %s WHERE device_id = %s",
+            (new_state, device_id)
+        )
+        conn.commit()
+        logger.info(f"{device_id} → {new_state}")
+    finally:
+        conn.close()
+
 
 def haversine(lat1, lng1, lat2, lng2) -> float:
     R = 6371
     lat1, lng1, lat2, lng2 = map(radians, [lat1, lng1, lat2, lng2])
-    a = sin((lat2-lat1)/2)**2 + cos(lat1)*cos(lat2)*sin((lng2-lng1)/2)**2
+    a = sin((lat2 - lat1) / 2) ** 2 + cos(lat1) * cos(lat2) * sin((lng2 - lng1) / 2) ** 2
     return R * 2 * asin(sqrt(a))
 
+
 def get_nearest_gateway(user_id: str, lat: float, lng: float) -> str:
-    logger.info("Getting gateways for user %s", user_id)
     conn = get_connection()
-    cur  = conn.cursor(dictionary=True)
-    cur.execute("SELECT * FROM gateways WHERE user_id = %s", (user_id,))
-    gateways = cur.fetchall()
-    conn.close()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM gateways WHERE user_id = %s", (user_id,))
+        gateways = cur.fetchall()
+    finally:
+        conn.close()
 
     if not gateways:
         raise Exception(f"No gateways registered for user {user_id}")
@@ -94,28 +110,32 @@ def get_nearest_gateway(user_id: str, lat: float, lng: float) -> str:
 
 
 def create_session(user_id: str) -> str:
-    """Generate a refresh token and store it in DB. Returns the token."""
     refresh_token = secrets.token_urlsafe(64)
     expires_at    = datetime.now() + timedelta(days=30)
 
     conn = get_connection()
-    cur  = conn.cursor()
-    cur.execute(
-        "INSERT INTO sessions (refresh_token, user_id, expires_at) VALUES (%s, %s, %s)",
-        (refresh_token, user_id, expires_at)
-    )
-    conn.commit()
-    conn.close()
-    logger.info(f" Created for {user_id}, expires {expires_at.date()}")
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO sessions (refresh_token, user_id, expires_at) VALUES (%s, %s, %s)",
+            (refresh_token, user_id, expires_at)
+        )
+        conn.commit()
+        logger.info(f"Session created for {user_id}, expires {expires_at.date()}")
+    finally:
+        conn.close()
+
     return refresh_token
 
+
 def get_session(refresh_token: str) -> dict:
-    """Look up a refresh token. Raises if invalid or expired."""
     conn = get_connection()
-    cur  = conn.cursor(dictionary=True)
-    cur.execute("SELECT * FROM sessions WHERE refresh_token = %s", (refresh_token,))
-    session = cur.fetchone()
-    conn.close()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM sessions WHERE refresh_token = %s", (refresh_token,))
+        session = cur.fetchone()
+    finally:
+        conn.close()
 
     if not session:
         raise Exception("Invalid refresh token")
@@ -123,11 +143,13 @@ def get_session(refresh_token: str) -> dict:
         raise Exception("Refresh token expired — please log in again")
     return session
 
+
 def delete_session(refresh_token: str):
-    """Delete a session (logout)."""
     conn = get_connection()
-    cur  = conn.cursor()
-    cur.execute("DELETE FROM sessions WHERE refresh_token = %s", (refresh_token,))
-    conn.commit()
-    conn.close()
-    logger.info(f"[SESSION] Deleted")
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM sessions WHERE refresh_token = %s", (refresh_token,))
+        conn.commit()
+        logger.info("Session deleted")
+    finally:
+        conn.close()

@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pyjwt
+httpx
+groq
+redis
+mysql-connector-python
+python-dotenv
+mcp

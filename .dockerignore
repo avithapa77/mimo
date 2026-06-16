@@ -1,0 +1,16 @@
+.env
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+.DS_Store
+serviceAccountKey.json
+mimo_session.txt
+google_auth_server.py
+run_pipeline.py
+nepaliToJson.py
+_temp.wav
+output.json
+*.sql
+myenv/
