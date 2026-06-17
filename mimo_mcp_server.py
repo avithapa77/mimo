@@ -1,14 +1,13 @@
 """
 mimo_mcp_server.py — Real MCP server for MiMo device skills
 
-This exposes  device skills as proper MCP tools that any
-MCP-compatible AI (including MiMo via Groq) can discover and call.
+This exposes device skills as proper MCP tools that any
+MCP-compatible AI can discover and call.
 
-python mimo_mcp_server.py
 """
 
 from mcp.server.fastmcp import FastMCP
-from db import get_devices, get_device_by_id, update_device_state
+from firestore import get_devices, get_device_by_id, update_device_state
 from skill_registry import execute_skill
 from config import setup_logging
 import logging
@@ -23,7 +22,6 @@ mcp = FastMCP("MiMo Smart Home")
 # ── Tool 1: Turn on a light ───────────────────────────────────────────────────
 @mcp.tool()
 def turn_on_light(device_id: str, gateway_id: str) -> str:
-
     device = get_device_by_id(device_id)
     result = execute_skill(device, "turn_on")
     if result["success"]:
@@ -35,7 +33,6 @@ def turn_on_light(device_id: str, gateway_id: str) -> str:
 # ── Tool 2: Turn off a light ──────────────────────────────────────────────────
 @mcp.tool()
 def turn_off_light(device_id: str, gateway_id: str) -> str:
-
     device = get_device_by_id(device_id)
     result = execute_skill(device, "turn_off")
     if result["success"]:
@@ -47,7 +44,6 @@ def turn_off_light(device_id: str, gateway_id: str) -> str:
 # ── Tool 3: Lock a door ───────────────────────────────────────────────────────
 @mcp.tool()
 def lock_door(device_id: str, gateway_id: str) -> str:
-
     device = get_device_by_id(device_id)
     result = execute_skill(device, "lock")
     if result["success"]:
@@ -70,7 +66,6 @@ def unlock_door(device_id: str, gateway_id: str) -> str:
 # ── Tool 5: Set AC temperature ────────────────────────────────────────────────
 @mcp.tool()
 def set_temperature(device_id: str, gateway_id: str, temperature: int) -> str:
-
     device = get_device_by_id(device_id)
     result = execute_skill(device, "set_temp", {"temperature": temperature})
     if result["success"]:
@@ -82,7 +77,6 @@ def set_temperature(device_id: str, gateway_id: str, temperature: int) -> str:
 # ── Tool 6: Get device status ─────────────────────────────────────────────────
 @mcp.tool()
 def get_device_status(device_id: str) -> str:
-
     device = get_device_by_id(device_id)
     result = execute_skill(device, "status")
     logger.info(f"[MCP] get_device_status: {result['message']}")
@@ -92,7 +86,6 @@ def get_device_status(device_id: str) -> str:
 # ── Tool 7: List all devices for a gateway ────────────────────────────────────
 @mcp.tool()
 def list_devices(gateway_id: str) -> str:
-
     devices = get_devices(gateway_id)
     if not devices:
         return f"No devices found for gateway {gateway_id}"

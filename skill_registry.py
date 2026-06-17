@@ -19,12 +19,6 @@ REGISTRY = {
 def execute_skill(device: dict, action: str, params: dict = None) -> dict:
     """
     Route an action to the correct skill based on device type.
-
-    Args:
-        device:  Full device row from MySQL
-        action:  Action from MiMo (turn_on, turn_off, lock, etc.)
-        params:  Optional params (e.g. temperature for set_temp)
-
     Returns:
         {"success": True/False, "new_state": "...", "message": "..."}
     """

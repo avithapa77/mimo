@@ -2,18 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install dependencies first (better layer caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY api.py .
-COPY config.py .
-COPY auth.py .
-COPY db.py .
-COPY mimo.py .
-COPY build_mimo_prompt.py .
-COPY skill_registry.py .
-COPY transcribe.py .
-COPY skills/ ./skills/
+# Copy everything else — .dockerignore excludes secrets and dev-only files
+COPY . .
 
 ENV PORT=8080
 

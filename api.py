@@ -1,15 +1,14 @@
 """
-Start the server:
-    uvicorn api:app --reload --port 8080
+
 
 Endpoints:
-    POST /auth/callback      — exchange Google code for tokens
-    POST /auth/refresh       — refresh expired access token
+    GET  /auth/validate      — verify Firebase ID token, upsert user
     GET  /gateways           — list user's homes
-    GET  /devices            — list devices for a gateway
+    GET  /devices             — list devices for a gateway
     POST /device/action      — manually control a device
     POST /pipeline           — voice command execution
-    POST /transcribe         -tranlate to nepali
+    POST /transcribe         — Nepali audio -> English text
+    GET  /health              — health check
 """
 
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
@@ -20,12 +19,10 @@ from typing import Optional
 import logging
 
 from config import setup_logging
-from auth import (
-    handle_google_callback,
-    refresh_access_token,
-    validate_token,
-)
-from db import (
+from firebase_auth import verify_firebase_token
+from firestore import (
+    get_or_create_user,
+    get_user_gateways,
     get_devices,
     get_device_by_id,
     get_nearest_gateway,
@@ -39,38 +36,32 @@ from transcribe import transcribe_audio
 setup_logging()
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Malati API", version="M4")
+app = FastAPI(title="Malati API", version="M4-firebase")
 
-# ── CORS — allow React Native app to call this server ────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten this in production
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ── Auth dependency — validates JWT on protected routes ──────────────────────
 security = HTTPBearer()
+
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
     """
-     Validates the Bearer token and returns the JWT claims.
+    Verifies the Firebase ID token and upserts the user in Firestore.
     Raises 401 if token is missing, expired, or invalid.
     """
     try:
-        claims = validate_token(credentials.credentials)
-        return claims
+        decoded = verify_firebase_token(credentials.credentials)
+        user    = get_or_create_user(decoded["uid"], decoded["email"], decoded["name"])
+        return user
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
 
 
-# ── Request / Response models ─────────────────────────────────────────────────
-
-class GoogleCallbackRequest(BaseModel):
-    code: str
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
+# ── Request models ─────────────────────────────────────────────────────────────
 
 class DeviceActionRequest(BaseModel):
     device_id: str
@@ -84,58 +75,21 @@ class PipelineRequest(BaseModel):
     lng:        Optional[float] = None
 
 
-# ── POST /auth/callback ───────────────────────────────────────────────────────
-@app.post("/auth/callback")
-def auth_callback(body: GoogleCallbackRequest):
-    """
-    Exchange Google auth code for access + refresh tokens.
-    Called once after Google Sign-In on the mobile app.
-
-    Request:  { "code": "<google_auth_code>" }
-    Response: { "access_token": "...", "refresh_token": "..." }
-    """
-    try:
-        tokens = handle_google_callback(body.code)
-        logger.info(f"[API] /auth/callback success")
-        return tokens
-    except Exception as e:
-        logger.error(f"[API] /auth/callback failed: {e}")
-        raise HTTPException(status_code=401, detail=str(e))
-
-
-# ── POST /auth/refresh ────────────────────────────────────────────────────────
-@app.post("/auth/refresh")
-def auth_refresh(body: RefreshRequest):
-    """
-    Get a new access token using a refresh token.
-    Called automatically by the Axios interceptor when a 401 is received.
-
-    Request:  { "refresh_token": "..." }
-    Response: { "access_token": "..." }
-    """
-    try:
-        access_token = refresh_access_token(body.refresh_token)
-        logger.info(f"[API] /auth/refresh success")
-        return {"access_token": access_token}
-    except Exception as e:
-        logger.error(f"[API] /auth/refresh failed: {e}")
-        raise HTTPException(status_code=401, detail=str(e))
-
-
 # ── GET /auth/validate ────────────────────────────────────────────────────────
 @app.get("/auth/validate")
 def auth_validate(user: dict = Depends(get_current_user)):
     """
-    Check if the current access token is valid.
+    Verify the Firebase ID token is valid and return the user profile.
     Called by the Splash screen on app open.
 
-    Response: { "valid": true, "user": { sub, email, name } }
+    Request:  Authorization: Bearer <firebase_id_token>
+    Response: { "valid": true, "user": { uid, email, name } }
     """
-    logger.info(f"[API] /auth/validate — user: {user.get('sub')}")
+    logger.info(f"[API] /auth/validate — user: {user.get('uid')}")
     return {
         "valid": True,
         "user": {
-            "sub":   user.get("sub"),
+            "uid":   user.get("uid"),
             "email": user.get("email"),
             "name":  user.get("name"),
         }
@@ -152,15 +106,9 @@ def get_gateways_endpoint(user: dict = Depends(get_current_user)):
     Response: [ { gateway_id, label, lat, lng } ]
     """
     try:
-        from db import get_connection
-        user_id = user["sub"]
-        conn = get_connection()
-        cur  = conn.cursor(dictionary=True)
-        cur.execute("SELECT gateway_id, label, lat, lng FROM gateways WHERE user_id = %s", (user_id,))
-        gateways = cur.fetchall()
-        conn.close()
-        logger.info(f"[API] /gateways — {len(gateways)} gateways for {user_id}")
-        return gateways
+        gateway_list = get_user_gateways(user["uid"])
+        logger.info(f"[API] /gateways — {len(gateway_list)} for {user['uid']}")
+        return gateway_list
     except Exception as e:
         logger.error(f"[API] /gateways failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -171,14 +119,14 @@ def get_gateways_endpoint(user: dict = Depends(get_current_user)):
 def get_devices_endpoint(gateway_id: str, user: dict = Depends(get_current_user)):
     """
     List all devices for a gateway with current states.
-    Called by the Devices screen on load and pull-to-refresh.
+    Called by the Devices screen
 
-    Query param: ?gateway_id=gw_kathmandu_home2
+    Query param: ?gateway_id=gw_kathmandu_home
     Response: [ { device_id, name, type, state, gateway_id } ]
     """
     try:
         devices = get_devices(gateway_id)
-        logger.info(f"[API] /devices — {len(devices)} devices for {gateway_id}")
+        logger.info(f"[API] /devices — {len(devices)} for {gateway_id}")
         return devices
     except Exception as e:
         logger.error(f"[API] /devices failed: {e}")
@@ -221,29 +169,25 @@ def pipeline_endpoint(body: PipelineRequest, user: dict = Depends(get_current_us
     Response: [ { "tool": "turn_off_light", "result": "Living Room Light turned off" } ]
     """
     try:
-        user_id    = user["sub"]
+        uid        = user["uid"]
         gateway_id = body.gateway_id
 
-        # Auto-select gateway from GPS if not provided
         if gateway_id is None:
             if body.lat is None or body.lng is None:
                 raise HTTPException(
                     status_code=400,
                     detail="Provide either gateway_id or lat/lng coordinates"
                 )
-            gateway_id = get_nearest_gateway(user_id, body.lat, body.lng)
+            gateway_id = get_nearest_gateway(uid, body.lat, body.lng)
 
         logger.info(f"[API] /pipeline — command: '{body.command}' gateway: {gateway_id}")
 
-        # Build prompt and run MiMo
-        system_prompt = build_mimo_prompt(user_id, gateway_id)
+        system_prompt = build_mimo_prompt(uid, gateway_id)
         tool_calls    = mimo(system_prompt, body.command)
 
-        # Build device map for this gateway
         devices    = get_devices(gateway_id)
         device_map = {d["device_id"]: d for d in devices}
 
-        # Execute each tool call through skill registry
         results = []
         TOOL_ACTION_MAP = {
             "turn_on_light":    "turn_on",
@@ -274,7 +218,7 @@ def pipeline_endpoint(body: PipelineRequest, user: dict = Depends(get_current_us
             if not device_id or not action:
                 continue
 
-            device       = device_map.get(device_id)
+            device = device_map.get(device_id)
             if not device:
                 continue
 
@@ -308,9 +252,11 @@ async def transcribe_endpoint(
     """
     Transcribe a Nepali audio file and return English translation.
     The mobile app should then pass "english" to POST /pipeline as the command.
+
+    Request:  multipart/form-data, field "file" = audio (wav/mp3/m4a/webm/ogg/flac, max 25MB)
+    Response: { "nepali": "...", "english": "..." }
     """
     try:
-        # Validate file type
         allowed = {".wav", ".mp3", ".m4a", ".webm", ".ogg", ".flac"}
         ext = "." + file.filename.split(".")[-1].lower() if "." in file.filename else ".wav"
         if ext not in allowed:
@@ -324,10 +270,10 @@ async def transcribe_endpoint(
         if len(audio_bytes) == 0:
             raise HTTPException(status_code=400, detail="Audio file is empty")
 
-        if len(audio_bytes) > 25 * 1024 * 1024:  # 25MB Groq limit
+        if len(audio_bytes) > 25 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="Audio file too large. Max 25MB.")
 
-        logger.info(f"[API] /transcribe — file: {file.filename}, size: {len(audio_bytes)} bytes, user: {user.get('sub')}")
+        logger.info(f"[API] /transcribe — file: {file.filename}, size: {len(audio_bytes)} bytes, user: {user.get('uid')}")
 
         result = transcribe_audio(audio_bytes, file.filename)
 
@@ -345,4 +291,4 @@ async def transcribe_endpoint(
 @app.get("/health")
 def health():
     """Quick check that the server is running."""
-    return {"status": "ok", "version": "M4"}
+    return {"status": "ok", "version": "M4-firebase"}
